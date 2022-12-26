@@ -78,11 +78,15 @@ class Worker {
 }
 
 class GeneticAlgorithm {
-  constructor() {}
+  constructor() {
+    this.workers;
+  }
 
   initialize() {
     this.workers = getWorkerInfo();
   }
-}
 
-document.writeln(getWorkerInfo()["현민"]);
+  run() {
+    return result;
+  }
+}
