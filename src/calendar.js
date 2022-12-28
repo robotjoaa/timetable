@@ -1,4 +1,3 @@
-
 //0 : 평일, 1 : 주말 전, 2 : 주말 중, 3 : 주말 마지막
 function processHoliday(hList, dateNum) {
   let pList = Array(dateNum).fill(0);
@@ -9,8 +8,8 @@ function processHoliday(hList, dateNum) {
       } else {
         pList[i - 1] = 3;
       }
+      if (!hList.includes(i - 1) && i != 1) pList[i - 2] = 1;
     }
-    if (!hList.includes(i - 1) && i != 1) pList[i - 2] = 1;
   }
   return pList;
 }
@@ -34,7 +33,7 @@ function holidayOrders(o, p) {
 }
 
 function makeColorDate(hList, startDayOffset, dateNum) {
-  let pList = processHolida(hList, dateNum);
+  let pList = processHoliday(hList, dateNum);
   let currDay = startDayOffset;
   let oList = Array(dateNum).fill(0);
   // set oList
@@ -55,8 +54,7 @@ function makeColorDate(hList, startDayOffset, dateNum) {
   return oList.map((o, i) => holidayOrders(o, pList[i]));
 }
 
-
-function createCalendar() {
+export function createCalendar(output, workerList) {
   let table = document.createElement("table");
   let thead = document.createElement("thead");
   let tbody = document.createElement("tbody");
@@ -91,24 +89,24 @@ function createCalendar() {
   let dateNum = endDate.getDate();
   let weekNum = Math.ceil((startDayOffset - 1 + dateNum) / 7);
 
-
   //주말을 제외한 공유일 추가
   let holidayList = [5];
   //저번 달 마지막 날(0) 공휴일 이었는지, 다음달 첫날(dateNum+1) 공휴일 인지 확인 필요
-    
+
   let coloredDate = makeColorDate(holidayList, startDayOffset, dateNum);
 
-  let num = 0;
+  let num = 1;
   for (let j = 0; j < weekNum; j++) {
     let tr_tmp = document.createElement("tr");
     tbody.append(tr_tmp);
+    let tmp_num = num;
     for (let i = 0; i < 7; i++) {
       let td_tmp = document.createElement("td");
       td_tmp.classList.add("date");
-      
-      let tmp = coloredDate[num];
-      
-      if(tmp === 1){
+
+      let tmp = coloredDate[num - 1];
+
+      if (tmp === 1) {
         td_tmp.classList.add("fri");
       } else if (tmp === 2) {
         td_tmp.classList.add("sat");
@@ -121,7 +119,6 @@ function createCalendar() {
       }
 
       if (num > dateNum) continue;
-
       td_tmp.innerHTML = num;
       num += 1;
     }
@@ -135,9 +132,11 @@ function createCalendar() {
       if (j == 0 && i < startDayOffset) {
         continue;
       }
-      td_tmp.innerHTML = "상병 나영채";
+
+      if (tmp_num > dateNum) continue;
+      console.log(workerList[output[tmp_num - 1].name]);
+      td_tmp.innerHTML = workerList[output[tmp_num - 1]];
+      tmp_num += 1;
     }
   }
 }
-
-createCalendar();

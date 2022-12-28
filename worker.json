@@ -1,17 +1,65 @@
 WorkerInfo = {
     "고현오" : {
         "rank" : 3,
-        "constraint" : [],
+        "constraints" : [
+            {
+                "type" : 0,
+                "start" : 1,
+                "end" : 7,
+                "desc" : "A지역 투입", 
+            },
+        ],
     },
-    "나영채" : [],
-    "최재현" : [],
-    "박정우" : [],
-    "정현민" : [],
-    "박준호" : [],
-    "김성은" : [],
-    "양창웅" : [],
-    "김동윤" : [],
-    "임도현" : [],
-    "이준영" : [],
-    "김태현" : [],
+    "나영채" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "최재현" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "박정우" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "강정권" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "정현민" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "박준호" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "김성은" : {
+        "rank" : 2,
+        "constraints" : [],
+    },
+    "양창웅" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
+    "김동윤" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
+    "이인우" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
+    "임도현" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
+    "이준영" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
+    "김태현" : {
+        "rank" : 1,
+        "constraints" : [],
+    },
 }
