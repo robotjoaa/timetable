@@ -1,4 +1,9 @@
-import { createCalendar } from "./calendar.js";
+import {
+  makeColorDate,
+  configMonth,
+  createCalendar,
+  createStats,
+} from "./calendar.js";
 
 /* genetic algorithm 
 1. initialize
@@ -14,42 +19,51 @@ import { createCalendar } from "./calendar.js";
 */
 
 /*
-    일요일 부터 시작
-    0    1   2   3    4   5    6    7   8    9    10
-    일주1 일주2 일야 월야 화야 수야 목야 금야 토주1 토주2 토야
-    
+    평일 : 0
+    금야 : 1
+    주말 주간1 : 2
+    주말 주간2 : 3
+    주말 야간 : 4
+    일요일 야간 : 5
 */
 const YEAR = 2022;
 const MONTH = 12;
-const SHIFT_NUM = [[0, 1, 2], [3], [4], [5], [6], [7], [8, 9, 10]];
+
+//주말을 제외한 공유일 추가
+//저번 달 마지막 날(0) 공휴일 이었는지, 다음달 첫날(dateNum+1) 공휴일 인지 확인 필요
+const HOLIDAY_LIST = [5];
 
 function makeShiftArr(year, month) {
-  let startDate = new Date(year, month - 1, 1);
-  let e_year = year;
-  let e_month = month;
-  if (month == 12) {
-    e_year += 1;
-    e_month = 1;
-  } else {
-    e_month += 1;
-  }
-
-  let endDate = new Date(e_year, e_month - 1, 1);
-  endDate.setDate(endDate.getDate() - 1);
-  let startDay = startDate.getDay();
-  let dateNum = endDate.getDate();
-
-  let currDay = startDay;
+  let monthInfo = configMonth(year, month);
+  let startDayOffset = monthInfo.offset;
+  let dateNum = monthInfo.len;
+  let coloredDate = makeColorDate(HOLIDAY_LIST, startDayOffset, dateNum);
   let result = [];
-  for (let i = 0; i < dateNum; i++) {
-    result.push(...SHIFT_NUM[currDay]);
-    currDay++;
-    if (currDay >= 7) currDay = 0;
+  for (let i = 0; i < coloredDate.length; i++) {
+    if (coloredDate[i] === 2) {
+      // 주말 중
+      result.push(...[2, 3, 4]);
+    } else if (coloredDate[i] === 3) {
+      // 주말 끝
+      result.push(...[2, 3, 5]);
+    } else {
+      result.push(coloredDate[i]);
+    }
   }
-  return result;
+  return { result: result, coloredDate: coloredDate };
 }
 
-const SHIFT_MASK = makeShiftArr(YEAR, MONTH);
+const SHIFT_CONFIG = makeShiftArr(YEAR, MONTH, HOLIDAY_LIST);
+const SHIFT_MASK = SHIFT_CONFIG.result;
+const SHIFT_NAME = [
+  "평일 야간",
+  "금 야간",
+  "토 주간1",
+  "토 주간2",
+  "토 야간",
+  "일 야간",
+];
+const COLORED_DATE = SHIFT_CONFIG.coloredDate;
 const SHIFT_LEN = SHIFT_MASK.length;
 const WORKER_BIT = 4; // modified by maximum number of worker
 const WORKER_NUM = 14;
@@ -149,5 +163,7 @@ class GeneticAlgorithm {
 let a = new Chromosome(SHIFT_LEN, WORKER_BIT, WORKER_NUM);
 a.init();
 let workerList = getWorkerInfo("worker.json");
-createCalendar(a.getOutput(), workerList);
-console.log(workerList);
+let output = a.getOutput();
+createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
+
+createStats(SHIFT_MASK, SHIFT_NAME, output, workerList);

@@ -1,3 +1,25 @@
+function getWeekNum(offset, len) {
+  return Math.ceil((offset - 1 + len) / 7);
+}
+
+export function configMonth(year, month) {
+  let startDate = new Date(year, month - 1, 1, 0, 1);
+  let e_year = year;
+  let e_month = month;
+  if (month == 12) {
+    e_year += 1;
+    e_month = 1;
+  } else {
+    e_month += 1;
+  }
+  let endDate = new Date(e_year, e_month - 1, 1, 0, 0);
+  endDate.setDate(endDate.getDate() - 1);
+  let startDayOffset = startDate.getDay();
+  let dateNum = endDate.getDate();
+
+  return { offset: startDayOffset, len: dateNum };
+}
+
 //0 : 평일, 1 : 주말 전, 2 : 주말 중, 3 : 주말 마지막
 function processHoliday(hList, dateNum) {
   let pList = Array(dateNum).fill(0);
@@ -32,7 +54,7 @@ function holidayOrders(o, p) {
   }
 }
 
-function makeColorDate(hList, startDayOffset, dateNum) {
+export function makeColorDate(hList, startDayOffset, dateNum) {
   let pList = processHoliday(hList, dateNum);
   let currDay = startDayOffset;
   let oList = Array(dateNum).fill(0);
@@ -54,7 +76,34 @@ function makeColorDate(hList, startDayOffset, dateNum) {
   return oList.map((o, i) => holidayOrders(o, pList[i]));
 }
 
-export function createCalendar(output, workerList) {
+function getFullName(workerList, i) {
+  //get full name of i th worker
+  let strRank = "";
+  switch (workerList[i].data.rank) {
+    case 0:
+      strRank = "이병";
+      break;
+    case 1:
+      strRank = "일병";
+      break;
+    case 2:
+      strRank = "상병";
+      break;
+    case 3:
+      strRank = "병장";
+      break;
+  }
+  return strRank + " " + workerList[i].name;
+}
+
+export function createCalendar(year, month, coloredDate, output, workerList) {
+  let divCalendar = document.createElement("div");
+  divCalendar.id = "calendar";
+  document.getElementById("body").appendChild(divCalendar);
+  let calendarTitle = document.createElement("div");
+  calendarTitle.id = "calendar_title";
+  calendarTitle.innerHTML = (year % 100) + "년 " + month + "월 상황병 근무표";
+  document.getElementById("calendar").appendChild(calendarTitle);
   let table = document.createElement("table");
   let thead = document.createElement("thead");
   let tbody = document.createElement("tbody");
@@ -62,7 +111,7 @@ export function createCalendar(output, workerList) {
   table.appendChild(thead);
   table.appendChild(tbody);
 
-  document.getElementById("body").appendChild(table);
+  document.getElementById("calendar").appendChild(table);
   let dayOfWeek = "일월화수목금토";
   thead.appendChild(document.createElement("tr"));
   for (let d = 0; d < 7; d++) {
@@ -72,30 +121,13 @@ export function createCalendar(output, workerList) {
     thead.append(th_tmp);
   }
 
-  let year = 2022;
-  let month = 12;
-  let startDate = new Date(year, month - 1, 1, 0, 1);
-  let e_year = year;
-  let e_month = month;
-  if (month == 12) {
-    e_year += 1;
-    e_month = 1;
-  } else {
-    e_month += 1;
-  }
-  let endDate = new Date(e_year, e_month - 1, 1, 0, 0);
-  endDate.setDate(endDate.getDate() - 1);
-  let startDayOffset = startDate.getDay();
-  let dateNum = endDate.getDate();
-  let weekNum = Math.ceil((startDayOffset - 1 + dateNum) / 7);
-
-  //주말을 제외한 공유일 추가
-  let holidayList = [5];
-  //저번 달 마지막 날(0) 공휴일 이었는지, 다음달 첫날(dateNum+1) 공휴일 인지 확인 필요
-
-  let coloredDate = makeColorDate(holidayList, startDayOffset, dateNum);
+  let monthInfo = configMonth(year, month);
+  let startDayOffset = monthInfo.offset;
+  let dateNum = monthInfo.len;
+  let weekNum = getWeekNum(startDayOffset, dateNum);
 
   let num = 1;
+  let nextIdx = 0;
   for (let j = 0; j < weekNum; j++) {
     let tr_tmp = document.createElement("tr");
     tbody.append(tr_tmp);
@@ -134,9 +166,66 @@ export function createCalendar(output, workerList) {
       }
 
       if (tmp_num > dateNum) continue;
-      console.log(workerList[output[tmp_num - 1].name]);
-      td_tmp.innerHTML = workerList[output[tmp_num - 1]];
+      let tmp = coloredDate[tmp_num - 1];
+      if (tmp > 1) {
+        // 주말 중, 주말 막 이면
+        for (let k = 0; k < 3; k++) {
+          let classStr = "";
+          if (k === 2) {
+            if (tmp === 2) classStr = "sat_night>";
+            else classStr = "sun_night>";
+          } else {
+            classStr = "sat_morn" + (k + 1) + ">";
+          }
+          td_tmp.innerHTML +=
+            "<div class=" +
+            classStr +
+            getFullName(workerList, output[nextIdx]) +
+            "</div>";
+          nextIdx += 1;
+        }
+      } else {
+        if (tmp === 1) {
+          td_tmp.innerHTML =
+            '<div class="fri_night">' +
+            getFullName(workerList, output[nextIdx]) +
+            "</div>";
+        } else {
+          td_tmp.innerHTML =
+            "<div>" + getFullName(workerList, output[nextIdx]) + "</div>";
+        }
+        nextIdx += 1;
+      }
       tmp_num += 1;
     }
+  }
+}
+
+export function createStats(shiftMask, shiftName, output, workerList) {
+  let divStats = document.createElement("div");
+  divStats.id = "statistics";
+  document.getElementById("body").appendChild(divStats);
+  let statsTitle = document.createElement("div");
+  statsTitle.id = "stats_title";
+  statsTitle.innerHTML = "인원 별 근무 투입 횟수";
+  document.getElementById("statistics").appendChild(statsTitle);
+  let table = document.createElement("table");
+  let thead = document.createElement("thead");
+  let tbody = document.createElement("tbody");
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  document.getElementById("statistics").appendChild(table);
+  thead.appendChild(document.createElement("tr"));
+  let th_tmp = document.createElement("th");
+  th_tmp.innerHTML = "관등성명";
+  thead.append(th_tmp);
+  for (let i = 0; i < shiftName.length; i++) {
+    let th_tmp = document.createElement("th");
+    th_tmp.innerHTML = shiftName[i];
+    thead.append(th_tmp);
+  }
+  let result = Array(workerList.length);
+  for (let i = 0; i < result.length; i++) {
+    result[i] = Array(6).fill(0);
   }
 }
