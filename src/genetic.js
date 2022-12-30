@@ -166,4 +166,15 @@ let workerList = getWorkerInfo("worker.json");
 let output = a.getOutput();
 createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
 
+export function getShiftStats(shiftMask, output, workerList){
+  let result = Array(workerList.length);
+  for (let i = 0; i < result.length; i++) {
+    result[i] = Array(6).fill(0);
+  }
+  for (let i = 0; i < output.length; i++) {
+    result[output[i]][shiftMask[i]] += 1;
+  } 
+  return result;
+}
+
 createStats(SHIFT_MASK, SHIFT_NAME, output, workerList);

@@ -1,3 +1,5 @@
+import { getShiftStats } from "./genetic.js";
+
 function getWeekNum(offset, len) {
   return Math.ceil((offset - 1 + len) / 7);
 }
@@ -224,8 +226,37 @@ export function createStats(shiftMask, shiftName, output, workerList) {
     th_tmp.innerHTML = shiftName[i];
     thead.append(th_tmp);
   }
-  let result = Array(workerList.length);
+  th_tmp = document.createElement("th");
+  th_tmp.innerHTML = "총합"
+  thead.append(th_tmp);
+  
+  let result = getShiftStats(shiftMask, output, workerList);
   for (let i = 0; i < result.length; i++) {
-    result[i] = Array(6).fill(0);
+    let tr_tmp = document.createElement("tr");
+    tbody.append(tr_tmp);
+    let sum = 0;
+    for (let j = 0; j < 8; j++){
+      let td_tmp = document.createElement("td");
+      if(j === 0){
+        let workername = getFullName(workerList, i);
+        td_tmp.innerHTML = "<span>" + getFullName(workerList, i) + "</span>";
+        let button_tmp = document.createElement('input type="button" class="statsButton"' + 
+        "id=" + getFullName(workerList, i) + 'value="확인" onclick="tgl"');
+        function tgl(){
+          let tmp_name = document.getElementById(workername);
+          if(tmp_name.value === "확인"){
+            tmp_name.value = "취소";
+          }
+          else if(tmp_name.value === "취소"){
+            tmp_name.value = "확인";
+          }
+        }
+      } else if(j === 7){
+        td_tmp.innerHTML = result[i].reduce((a, b) => a + b, 0);
+      } else{
+        td_tmp.innerHTML = result[i][j-1];
+      }
+      tr_tmp.append(td_tmp);
+    }
   }
 }
