@@ -39,18 +39,25 @@ function makeShiftArr(year, month) {
   let dateNum = monthInfo.len;
   let coloredDate = makeColorDate(HOLIDAY_LIST, startDayOffset, dateNum);
   let result = [];
+  let dateOffset = [];
+  let currOffset = 0;
   for (let i = 0; i < coloredDate.length; i++) {
+    dateOffset.push(currOffset);
     if (coloredDate[i] === 2) {
       // 주말 중
       result.push(...[2, 3, 4]);
+      currOffset += 3;
     } else if (coloredDate[i] === 3) {
       // 주말 끝
       result.push(...[2, 3, 5]);
+      currOffset += 3;
     } else {
       result.push(coloredDate[i]);
+      currOffset += 1;
     }
   }
-  return { result: result, coloredDate: coloredDate };
+  dateOffset.push(currOffset);
+  return { result: result, coloredDate: coloredDate, dateOffset: dateOffset };
 }
 
 const SHIFT_CONFIG = makeShiftArr(YEAR, MONTH, HOLIDAY_LIST);
@@ -89,6 +96,7 @@ class Chromosome {
       return Math.random() >= prob ? 1 : 0;
     }
     this.value = this.value.map(rndFunc);
+
     this.errorResolve();
   }
 
@@ -97,7 +105,7 @@ class Chromosome {
     //s_len 만큼 묶어서
     let tmp = 0;
     for (let j = 0; j < this.sLen; j++) {
-      tmp = (tmp << 1) + this.value[i + j];
+      tmp = (tmp << 1) + this.value[this.sLen * i + j];
     }
     return tmp;
   }
@@ -105,9 +113,18 @@ class Chromosome {
   setSlotValue(i, val) {
     //set i th value as val
     for (let j = this.sLen - 1; j >= 0; j--) {
-      this.value[i + j] = val % 2;
+      this.value[this.sLen * i + j] = val % 2;
       val >>= 1;
     }
+  }
+
+  printChromosome() {
+    let list = [];
+    for (let i = 0; i < this.sNum; i++) {
+      let tmp = this.getSlotValue(i);
+      list.push(tmp);
+    }
+    console.log(list);
   }
 
   errorResolve() {
@@ -159,21 +176,95 @@ class GeneticAlgorithm {
     return result;
   }
 }
+function range(start, end) {
+  // start ... end
+  if (end < start) return [];
+  return [...Array(end - start + 1).keys()].map((i) => i + start);
+}
+
+let checkFuncList = [noCertainDate];
+
+function isNight(a) {
+  //평야, 금야, 토주1, 토주2, 토야, 일야
+  return a != 2 && a != 3;
+}
+
+function makeBlackList(ranges) {
+  //create BlackList from ranges in constraints
+  let result = [];
+  for (let i = 0; i < ranges.length; i++) {
+    result.concat(range(ranges[i].start, ranges[i].end));
+  }
+  return result;
+}
+
+function getShiftOnDate(shiftMask, output, workerList, idx, date) {
+  //returns index of shift on that date for that worker
+  for (
+    let i = shiftMask.dateOffset[date];
+    i < shiftMask.dateOffset[date + 1];
+    i++
+  ) {}
+}
+
+function noCertainDate(shiftMask, output, workerList, idx, blackList) {
+  //blackList에 해당하는 근무가 idx번째 근무자에게 없는지 확인
+  let errorMsg = "";
+  for (let b = 0; b < blackList.length; b++) {
+    let shiftList = getShiftOnDate(
+      shiftMask,
+      output,
+      workerList,
+      idx,
+      blackList[b]
+    );
+    for (let s = 0; s < shiftList.length; s++) {
+      errorMsg += shiftList[s] + ", ";
+    }
+  }
+  return errorMsg;
+}
+
+function checkWorker(shiftMask, output, workerList, idx) {
+  let cList = workerList[idx].data.constraints;
+  let errorMsg = "";
+  let num = 0;
+  for (let i = 0; i < cList.length; i++) {
+    let checkFunc = checkFuncList[cList[i].type];
+    let blackList = makeBlackList(cList[i].ranges);
+    let checkRes = checkFunc(shiftMask, output, workerList, idx, blackList);
+    if (checkRes) {
+      errorMsg += num + ") " + cList[i].desc + " 위반 : " + checkRes + "\n";
+      num++;
+    }
+  }
+  return errorMsg;
+}
+
+function checkConstraints(workerList) {
+  let errorBoard = document.createElement("div");
+  errorBoard.classList.add("errorBoard");
+  document.getElementsById("body").appendChild(errorBoard);
+  for (let i = 0; i < workerList.length; i++) {
+    errorBoard.innerText += checkWorker(workerList, i);
+  }
+}
 
 let a = new Chromosome(SHIFT_LEN, WORKER_BIT, WORKER_NUM);
 a.init();
 let workerList = getWorkerInfo("worker.json");
 let output = a.getOutput();
+
 createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
 
-export function getShiftStats(shiftMask, output, workerList){
+export function getShiftStats(shiftMask, output, workerList) {
   let result = Array(workerList.length);
   for (let i = 0; i < result.length; i++) {
     result[i] = Array(6).fill(0);
   }
   for (let i = 0; i < output.length; i++) {
     result[output[i]][shiftMask[i]] += 1;
-  } 
+  }
   return result;
 }
 

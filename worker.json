@@ -4,8 +4,9 @@ WorkerInfo = {
         "constraints" : [
             {
                 "type" : 0,
-                "start" : 1,
-                "end" : 7,
+                "ranges" : [
+                    {"start": 1, "end" : 7},
+                ],
                 "desc" : "A지역 투입", 
             },
         ],
@@ -42,7 +43,7 @@ WorkerInfo = {
         "rank" : 1,
         "constraints" : [],
     },
-    "김동윤" : {
+    "강동윤" : {
         "rank" : 1,
         "constraints" : [],
     },

@@ -78,6 +78,10 @@ export function makeColorDate(hList, startDayOffset, dateNum) {
   return oList.map((o, i) => holidayOrders(o, pList[i]));
 }
 
+function getName(workerList, i) {
+  return workerList[i].name;
+}
+
 function getFullName(workerList, i) {
   //get full name of i th worker
   let strRank = "";
@@ -95,7 +99,7 @@ function getFullName(workerList, i) {
       strRank = "병장";
       break;
   }
-  return strRank + " " + workerList[i].name;
+  return strRank + " " + getName(workerList, i);
 }
 
 export function createCalendar(year, month, coloredDate, output, workerList) {
@@ -169,32 +173,38 @@ export function createCalendar(year, month, coloredDate, output, workerList) {
 
       if (tmp_num > dateNum) continue;
       let tmp = coloredDate[tmp_num - 1];
+
       if (tmp > 1) {
         // 주말 중, 주말 막 이면
         for (let k = 0; k < 3; k++) {
           let classStr = "";
           if (k === 2) {
-            if (tmp === 2) classStr = "sat_night>";
-            else classStr = "sun_night>";
+            if (tmp === 2) classStr = '"sat_night ';
+            else classStr = '"sun_night ';
           } else {
-            classStr = "sat_morn" + (k + 1) + ">";
+            classStr = '"sat_morn' + (k + 1) + " ";
           }
+          classStr += getName(workerList, output[nextIdx]) + '">';
           td_tmp.innerHTML +=
-            "<div class=" +
-            classStr +
-            getFullName(workerList, output[nextIdx]) +
-            "</div>";
+            "<div class=" + classStr + getFullName(workerList, output[nextIdx]);
+          +"</div>";
           nextIdx += 1;
         }
       } else {
         if (tmp === 1) {
           td_tmp.innerHTML =
-            '<div class="fri_night">' +
-            getFullName(workerList, output[nextIdx]) +
-            "</div>";
+            '<div class="fri_night ' +
+            getName(workerList, output[nextIdx]) +
+            '">' +
+            getFullName(workerList, output[nextIdx]);
+          +"</div>";
         } else {
           td_tmp.innerHTML =
-            "<div>" + getFullName(workerList, output[nextIdx]) + "</div>";
+            '<div class="' +
+            getName(workerList, output[nextIdx]) +
+            '">' +
+            getFullName(workerList, output[nextIdx]);
+          +"</div>";
         }
         nextIdx += 1;
       }
@@ -227,34 +237,45 @@ export function createStats(shiftMask, shiftName, output, workerList) {
     thead.append(th_tmp);
   }
   th_tmp = document.createElement("th");
-  th_tmp.innerHTML = "총합"
+  th_tmp.innerHTML = "총합";
   thead.append(th_tmp);
-  
+
   let result = getShiftStats(shiftMask, output, workerList);
   for (let i = 0; i < result.length; i++) {
     let tr_tmp = document.createElement("tr");
     tbody.append(tr_tmp);
-    let sum = 0;
-    for (let j = 0; j < 8; j++){
+    for (let j = 0; j < 8; j++) {
       let td_tmp = document.createElement("td");
-      if(j === 0){
+      if (j === 0) {
         let workername = getFullName(workerList, i);
-        td_tmp.innerHTML = "<span>" + getFullName(workerList, i) + "</span>";
-        let button_tmp = document.createElement('input type="button" class="statsButton"' + 
-        "id=" + getFullName(workerList, i) + 'value="확인" onclick="tgl"');
-        function tgl(){
-          let tmp_name = document.getElementById(workername);
-          if(tmp_name.value === "확인"){
-            tmp_name.value = "취소";
-          }
-          else if(tmp_name.value === "취소"){
-            tmp_name.value = "확인";
+        td_tmp.innerHTML = "<span>" + workername + "</span>";
+        let button_tmp = document.createElement("button");
+        button_tmp.classList.add("statsButton");
+        let name_short = getName(workerList, i);
+        button_tmp.id = name_short + "button";
+        button_tmp.innerHTML = "확인";
+        function tgl() {
+          let tmp_button = document.getElementById(name_short + "button");
+          let select_list = document.getElementsByClassName(name_short);
+
+          if (tmp_button.innerHTML === "확인") {
+            for (let k = 0; k < select_list.length; k++) {
+              select_list[k].classList.add("selected");
+            }
+            tmp_button.innerHTML = "취소";
+          } else if (tmp_button.innerHTML === "취소") {
+            for (let k = 0; k < select_list.length; k++) {
+              select_list[k].classList.remove("selected");
+            }
+            tmp_button.innerHTML = "확인";
           }
         }
-      } else if(j === 7){
+        button_tmp.onclick = tgl;
+        td_tmp.appendChild(button_tmp);
+      } else if (j === 7) {
         td_tmp.innerHTML = result[i].reduce((a, b) => a + b, 0);
-      } else{
-        td_tmp.innerHTML = result[i][j-1];
+      } else {
+        td_tmp.innerHTML = result[i][j - 1];
       }
       tr_tmp.append(td_tmp);
     }
