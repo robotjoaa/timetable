@@ -3,6 +3,8 @@ import {
   configMonth,
   createCalendar,
   createStats,
+  getName,
+  getFullName,
 } from "./calendar.js";
 
 /* genetic algorithm 
@@ -26,12 +28,16 @@ import {
     주말 야간 : 4
     일요일 야간 : 5
 */
-const YEAR = 2022;
-const MONTH = 12;
+//const YEAR = 2022;
+//const MONTH = 12;
+
+const YEAR = 2023;
+const MONTH = 1;
 
 //주말을 제외한 공유일 추가
 //저번 달 마지막 날(0) 공휴일 이었는지, 다음달 첫날(dateNum+1) 공휴일 인지 확인 필요
-const HOLIDAY_LIST = [5];
+//전투휴무날 다 안 쉬는 경우에 대한 고려? => 별로 없는 경우인지
+const HOLIDAY_LIST = [6, 23, 24];
 
 function makeShiftArr(year, month) {
   let monthInfo = configMonth(year, month);
@@ -193,69 +199,193 @@ function makeBlackList(ranges) {
   //create BlackList from ranges in constraints
   let result = [];
   for (let i = 0; i < ranges.length; i++) {
-    result.concat(range(ranges[i].start, ranges[i].end));
+    result.push(...range(ranges[i].start, ranges[i].end));
   }
   return result;
 }
 
-function getShiftOnDate(shiftMask, output, workerList, idx, date) {
-  //returns index of shift on that date for that worker
-  for (
-    let i = shiftMask.dateOffset[date];
-    i < shiftMask.dateOffset[date + 1];
-    i++
-  ) {}
+function getShiftOnDate(shiftConf, output, workerList, idx, date) {
+  //returns index of shifts on that date for that worker
+  let offset = shiftConf.dateOffset;
+  //console.log(offset);
+  //console.log(output);
+  let result = [];
+  for (let i = offset[date - 1]; i < offset[date]; i++) {
+    //date start from 0
+    if (output[i] === idx) {
+      result.push(i);
+    }
+  }
+  return result;
 }
 
-function noCertainDate(shiftMask, output, workerList, idx, blackList) {
+function getShiftString(shiftConf, shiftName, date, idx) {
+  return date + "일 " + shiftName[shiftConf.result[idx]];
+}
+
+function noCertainDate(
+  shiftConf,
+  shiftName,
+  output,
+  workerList,
+  idx,
+  blackList
+) {
   //blackList에 해당하는 근무가 idx번째 근무자에게 없는지 확인
   let errorMsg = "";
+  let result = [];
   for (let b = 0; b < blackList.length; b++) {
+    let currDate = blackList[b];
     let shiftList = getShiftOnDate(
-      shiftMask,
+      shiftConf,
       output,
       workerList,
       idx,
-      blackList[b]
+      currDate
     );
+    result.push(...shiftList);
     for (let s = 0; s < shiftList.length; s++) {
-      errorMsg += shiftList[s] + ", ";
+      // what shift is shiftList[s]
+      errorMsg +=
+        getShiftString(shiftConf, shiftName, currDate, shiftList[s]) + ", ";
     }
   }
-  return errorMsg;
+  return { msg: errorMsg, idx: result };
 }
 
-function checkWorker(shiftMask, output, workerList, idx) {
+function checkWorker(shiftConf, shiftName, output, workerList, idx) {
   let cList = workerList[idx].data.constraints;
-  let errorMsg = "";
-  let num = 0;
+  let errorMsg = "[" + getFullName(workerList, idx) + "]\n";
+  let num = 1;
+  let errorIdx = [];
   for (let i = 0; i < cList.length; i++) {
     let checkFunc = checkFuncList[cList[i].type];
     let blackList = makeBlackList(cList[i].ranges);
-    let checkRes = checkFunc(shiftMask, output, workerList, idx, blackList);
-    if (checkRes) {
-      errorMsg += num + ") " + cList[i].desc + " 위반 : " + checkRes + "\n";
+    let checkRes = checkFunc(
+      shiftConf,
+      shiftName,
+      output,
+      workerList,
+      idx,
+      blackList
+    );
+    if (checkRes.idx.length) {
+      errorIdx.push({ type: cList[i].type, idx: checkRes.idx });
+      errorMsg += num + ") " + cList[i].desc + " 위반 : " + checkRes.msg + "\n";
       num++;
     }
   }
-  return errorMsg;
+  return { msg: errorMsg, info: errorIdx };
 }
 
-function checkConstraints(workerList) {
-  let errorBoard = document.createElement("div");
-  errorBoard.classList.add("errorBoard");
-  document.getElementsById("body").appendChild(errorBoard);
+function checkConstraints(shiftMask, shiftName, output, workerList) {
+  let errorBoard = document.getElementById("errorBoard");
+  let infoList = [];
   for (let i = 0; i < workerList.length; i++) {
-    errorBoard.innerText += checkWorker(workerList, i);
+    let checkResult = checkWorker(shiftMask, shiftName, output, workerList, i);
+    errorBoard.innerText += checkResult.msg;
+    if (checkResult.info.length) infoList.push(checkResult.info);
   }
+  return infoList;
+}
+
+function makeWrongDict(checkResult) {
+  //checkResult : i번째 worker가 어떤 type에 의해서 위배되는 게 몇번째 근무인지
+  // 각 근무별로 위반 되는 constraints가 나오게 mapping
+  let wrongDict = {};
+  for (let i = 0; i < checkResult.length; i++) {
+    console.log(checkResult);
+    for (let j = 0; j < checkResult[i].length; j++) {
+      let tmp_idx = checkResult[i][j].idx;
+      let tmp_type = checkResult[i][j].type;
+      for (let k = 0; k < tmp_idx.length; k++) {
+        if (wrongDict[tmp_idx[k]]) {
+          wrongDict[tmp_idx[k]].push(tmp_type);
+          console.log("pushed");
+        } else {
+          wrongDict[tmp_idx[k]] = [tmp_type];
+        }
+      }
+    }
+  }
+  return wrongDict;
 }
 
 let a = new Chromosome(SHIFT_LEN, WORKER_BIT, WORKER_NUM);
 a.init();
 let workerList = getWorkerInfo("worker.json");
+
+/*
 let output = a.getOutput();
 
-createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
+let checkResult = checkConstraints(
+  SHIFT_CONFIG,
+  SHIFT_NAME,
+  output,
+  workerList
+);
+let wrongDict = makeWrongDict(checkResult);
+*/
+let wrongDict = {};
+let output = [
+  ,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0, // week 1
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0, // week 2
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0, // week 3
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0, // week 4
+  0,
+  0,
+  0,
+  0,
+  0, // week 5
+];
+
+createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList, wrongDict);
 
 export function getShiftStats(shiftMask, output, workerList) {
   let result = Array(workerList.length);
@@ -268,4 +398,5 @@ export function getShiftStats(shiftMask, output, workerList) {
   return result;
 }
 
-createStats(SHIFT_MASK, SHIFT_NAME, output, workerList);
+//need edit, save calendar mode
+//createStats(SHIFT_MASK, SHIFT_NAME, output, workerList);

@@ -78,11 +78,11 @@ export function makeColorDate(hList, startDayOffset, dateNum) {
   return oList.map((o, i) => holidayOrders(o, pList[i]));
 }
 
-function getName(workerList, i) {
+export function getName(workerList, i) {
   return workerList[i].name;
 }
 
-function getFullName(workerList, i) {
+export function getFullName(workerList, i) {
   //get full name of i th worker
   let strRank = "";
   switch (workerList[i].data.rank) {
@@ -102,10 +102,15 @@ function getFullName(workerList, i) {
   return strRank + " " + getName(workerList, i);
 }
 
-export function createCalendar(year, month, coloredDate, output, workerList) {
-  let divCalendar = document.createElement("div");
-  divCalendar.id = "calendar";
-  document.getElementById("body").appendChild(divCalendar);
+export function createCalendar(
+  year,
+  month,
+  coloredDate,
+  output,
+  workerList,
+  wrongList
+) {
+  let divCalendar = document.getElementById(calendar);
   let calendarTitle = document.createElement("div");
   calendarTitle.id = "calendar_title";
   calendarTitle.innerHTML = (year % 100) + "년 " + month + "월 상황병 근무표";
