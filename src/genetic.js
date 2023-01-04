@@ -188,23 +188,49 @@ function range(start, end) {
   return [...Array(end - start + 1).keys()].map((i) => i + start);
 }
 
-let checkFuncList = [noCertainDate];
+let checkFuncList = [noCertainDate, () => {}];
 
 function isNight(a) {
   //평야, 금야, 토주1, 토주2, 토야, 일야
   return a != 2 && a != 3;
 }
 
-function makeBlackList(ranges) {
-  //create BlackList from ranges in constraints
-  let result = [];
-  for (let i = 0; i < ranges.length; i++) {
-    result.push(...range(ranges[i].start, ranges[i].end));
-  }
-  return result;
+function parseDate(str) {
+  let tmp = str.split["_"];
+  let year = tmp[0];
+  let month = tmp[1];
+  let date = tmp[2];
+  let shift = tmp[3]; //주말일 경우, 0 : 주간1, 1 : 주간2, 2 : 야간, 평일일 경우 2 : 야간
+  return { year: year, month: month, date: date, shift: shift };
 }
 
-function getShiftOnDate(shiftConf, output, workerList, idx, date) {
+function makeDateValid(range, shiftConf, output, idx, date) {
+  let startParse = parseDate(range.start);
+  let endParse = parseDate(range.end);
+  let isValid = false;
+  let startIdx = 0;
+  let endIdx = 0;
+  if (YEAR <= endParse.year && MONTH <= endParse.month) {
+    if (startParse.year <= YEAR || startParse.month <= MONTH) {
+      startIdx = 0;
+    } else {
+      let getShiftOnDate(shiftConf, output, idx, date);
+      (startIdx = startParse.date), startParse.shift;
+    }
+  }
+  return { isValid: isValid, start: startIdx, end: endIdx }; //get shift index
+}
+
+function* genBlackList(ranges, shiftConf, output, idx, date) {
+  //create BlackList from ranges in constraints
+  for (let i = 0; i < ranges.length; i++) {
+    let validDate = makeDateValid(ranges[i]);
+    if (validDate.isValid) yield range(validDate.start, validDate.end);
+    else yield null;
+  }
+}
+
+function getShiftOnDate(shiftConf, output, idx, date) {
   //returns index of shifts on that date for that worker
   let offset = shiftConf.dateOffset;
   //console.log(offset);
@@ -315,8 +341,13 @@ let a = new Chromosome(SHIFT_LEN, WORKER_BIT, WORKER_NUM);
 a.init();
 let workerList = getWorkerInfo("worker.json");
 
-/*
-let output = a.getOutput();
+//let output = a.getOutput();
+
+let output = [
+  14, 13, 6, 11, 7, 12, 5, 14, 12, 2, 12, 11, 7, 7, 14, 5, 5, 3, 2, 6, 14, 5, 3,
+  11, 2, 6, 3, 11, 7, 6, 5, 11, 13, 5, 3, 11, 11, 9, 14, 10, 8, 2, 7, 6, 7, 4,
+  3, 9, 5, 4, 3, 3, 2, 8, 2, 14,
+];
 
 let checkResult = checkConstraints(
   SHIFT_CONFIG,
@@ -324,66 +355,8 @@ let checkResult = checkConstraints(
   output,
   workerList
 );
+
 let wrongDict = makeWrongDict(checkResult);
-*/
-let wrongDict = {};
-let output = [
-  ,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0, // week 1
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0, // week 2
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0, // week 3
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0, // week 4
-  0,
-  0,
-  0,
-  0,
-  0, // week 5
-];
 
 createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList, wrongDict);
 
