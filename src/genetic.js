@@ -195,8 +195,14 @@ function isNight(a) {
   return a != 2 && a != 3;
 }
 
+function isHoliday(a) {
+  return a != 0 && a != 1;
+}
+
 function parseDate(str) {
-  let tmp = str.split["_"];
+  let tmp = str.split("_").map((e) => {
+    return parseInt(e, 10);
+  });
   let year = tmp[0];
   let month = tmp[1];
   let date = tmp[2];
@@ -204,29 +210,58 @@ function parseDate(str) {
   return { year: year, month: month, date: date, shift: shift };
 }
 
-function makeDateValid(range, shiftConf, output, idx, date) {
+function getIdxOfShift(date, shift, shiftConf) {
+  let idx = 0;
+  let shiftLen = shiftConf.offset[date] - shiftConf.offset[date - 1];
+  console.log(shiftLen);
+  if (shiftLen === 3) {
+    idx = shiftConf.offset[date - 1] + shift;
+  } else if (shiftLen === 1) {
+    idx = shiftConf.offset[date - 1];
+  }
+  return idx;
+}
+
+function makeDateValid(range, shiftConf) {
   let startParse = parseDate(range.start);
   let endParse = parseDate(range.end);
   let isValid = false;
   let startIdx = 0;
   let endIdx = 0;
-  if (YEAR <= endParse.year && MONTH <= endParse.month) {
-    if (startParse.year <= YEAR || startParse.month <= MONTH) {
+  // is endParse after current YEAR and MONTH
+  if (YEAR % 100 <= endParse.year && MONTH <= endParse.month) {
+    // is startParse before current YEAR and MONTH
+    if (startParse.year <= YEAR % 100 || startParse.month <= MONTH) {
       startIdx = 0;
     } else {
-      let getShiftOnDate(shiftConf, output, idx, date);
-      (startIdx = startParse.date), startParse.shift;
+      // read it from json
+      startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
     }
+    endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
+    isValid = true;
   }
   return { isValid: isValid, start: startIdx, end: endIdx }; //get shift index
 }
 
-function* genBlackList(ranges, shiftConf, output, idx, date) {
+function* genBlackList(ranges, shiftConf) {
   //create BlackList from ranges in constraints
   for (let i = 0; i < ranges.length; i++) {
-    let validDate = makeDateValid(ranges[i]);
+    let validDate = makeDateValid(ranges[i], shiftConf);
     if (validDate.isValid) yield range(validDate.start, validDate.end);
-    else yield null;
+  }
+}
+
+function makeBlackList(workerList, shiftConf) {
+  for (let idx = 0; idx < workerList.length; idx++) {
+    let cList = workerList[idx].data.constraints;
+    for (let i = 0; i < cList.length; i++) {
+      let ranges = cList[i].ranges;
+      while (true) {
+        let blackList = genBlackList(ranges, shiftConf).next();
+        console.log(blackList);
+        if (blackList.done) break;
+      }
+    }
   }
 }
 
@@ -349,13 +384,15 @@ let output = [
   3, 9, 5, 4, 3, 3, 2, 8, 2, 14,
 ];
 
+let blackList = makeBlackList(workerList, SHIFT_CONFIG);
+/*
 let checkResult = checkConstraints(
   SHIFT_CONFIG,
   SHIFT_NAME,
   output,
   workerList
 );
-
+*/
 let wrongDict = makeWrongDict(checkResult);
 
 createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList, wrongDict);
