@@ -212,57 +212,80 @@ function parseDate(str) {
 
 function getIdxOfShift(date, shift, shiftConf) {
   let idx = 0;
-  let shiftLen = shiftConf.offset[date] - shiftConf.offset[date - 1];
-  console.log(shiftLen);
+  let shiftLen = shiftConf.dateOffset[date] - shiftConf.dateOffset[date - 1];
   if (shiftLen === 3) {
-    idx = shiftConf.offset[date - 1] + shift;
+    idx = shiftConf.dateOffset[date - 1] + shift;
   } else if (shiftLen === 1) {
-    idx = shiftConf.offset[date - 1];
+    idx = shiftConf.dateOffset[date - 1];
   }
   return idx;
+}
+
+// is y2, m2 is equal or larger than y1, m1
+function compareYM(y1, m1, y2, m2) {
+  let d1 = new Date(2000 + y1, m1, 1);
+  let d2 = new Date(2000 + y2, m2, 1);
+  return Math.sign(d2 - d1);
 }
 
 function makeDateValid(range, shiftConf) {
   let startParse = parseDate(range.start);
   let endParse = parseDate(range.end);
-  let isValid = false;
+  let isValid = true;
   let startIdx = 0;
-  let endIdx = 0;
+  let endIdx = shiftConf.result.length - 1;
+  let cmpStart = compareYM(
+    startParse.year,
+    startParse.month,
+    YEAR % 100,
+    MONTH
+  );
+  let cmpEnd = compareYM(YEAR % 100, MONTH, endParse.year, endParse.month);
   // is endParse after current YEAR and MONTH
-  if (YEAR % 100 <= endParse.year && MONTH <= endParse.month) {
+  if (cmpEnd < 0) {
+    isValid = false;
+  } else {
     // is startParse before current YEAR and MONTH
-    if (startParse.year <= YEAR % 100 || startParse.month <= MONTH) {
-      startIdx = 0;
-    } else {
-      // read it from json
+    if (cmpStart === 0)
       startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
-    }
-    endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
-    isValid = true;
+    if (cmpEnd === 0)
+      endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
   }
   return { isValid: isValid, start: startIdx, end: endIdx }; //get shift index
 }
 
 function* genBlackList(ranges, shiftConf) {
   //create BlackList from ranges in constraints
-  for (let i = 0; i < ranges.length; i++) {
-    let validDate = makeDateValid(ranges[i], shiftConf);
-    if (validDate.isValid) yield range(validDate.start, validDate.end);
+  for (let r of ranges) {
+    let validDate = makeDateValid(r, shiftConf);
+    if (validDate.isValid)
+      yield {
+        desc: r.desc,
+        list: range(validDate.start, validDate.end),
+      };
   }
 }
 
 function makeBlackList(workerList, shiftConf) {
+  let result = Array(workerList.length)
+    .fill(0)
+    .map((_) => []);
   for (let idx = 0; idx < workerList.length; idx++) {
     let cList = workerList[idx].data.constraints;
     for (let i = 0; i < cList.length; i++) {
+      let workerResult = { type: cList[i].type, list: [] };
       let ranges = cList[i].ranges;
+      let blackGen = genBlackList(ranges, shiftConf);
       while (true) {
-        let blackList = genBlackList(ranges, shiftConf).next();
-        console.log(blackList);
-        if (blackList.done) break;
+        let tmp = blackGen.next();
+        if (tmp.done) break;
+        workerResult.list.push(tmp.value);
       }
+      result[idx].push(workerResult);
     }
   }
+  console.log(result);
+  return result;
 }
 
 function getShiftOnDate(shiftConf, output, idx, date) {
@@ -393,9 +416,47 @@ let checkResult = checkConstraints(
   workerList
 );
 */
-let wrongDict = makeWrongDict(checkResult);
+//let wrongDict = makeWrongDict(checkResult);
 
-createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList, wrongDict);
+createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
+
+// get ith div and color that div
+// date of that ith shift
+
+function idxToDate(shiftConf, idx) {
+  for (let i = 0; i < shiftConf.dateOffset.length; i++) {
+    if (idx <= shiftConf.dateOffset[i]) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getDivOfRange(shiftConf, start, end) {
+  let td_list = document.getElementsByClassName("name");
+  let startDate = idxToDate(shiftConf, start);
+  let endDate = idxToDate(shiftConf, end);
+  if (startDate < 0 || endDate < 0) {
+    return undefined;
+  }
+  let div_list = td_list[0].querySelectorAll("div");
+  for (let d of div_list) {
+    console.log(d);
+    d.classList.add("constraint");
+  }
+}
+
+getDivOfRange(SHIFT_CONFIG, 0, 30);
+
+// modify calendar with blackList
+function colorConst(i) {
+  // get div of that worker
+  let name_short = getName(workerList, i);
+  let select_list = document.getElementsByClassName(name_short);
+  for (let worker of select_list) {
+    worker.classList.add("constraint");
+  }
+}
 
 export function getShiftStats(shiftMask, output, workerList) {
   let result = Array(workerList.length);
