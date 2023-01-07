@@ -424,39 +424,98 @@ createCalendar(YEAR, MONTH, COLORED_DATE, output, workerList);
 // date of that ith shift
 
 function idxToDate(shiftConf, idx) {
-  for (let i = 0; i < shiftConf.dateOffset.length; i++) {
-    if (idx <= shiftConf.dateOffset[i]) {
-      return i;
+  for (let i = 1; i < shiftConf.dateOffset.length; i++) {
+    if (shiftConf.dateOffset[i] > idx) {
+      return { date: i - 1, offset: idx - shiftConf.dateOffset[i - 1] };
     }
   }
-  return -1;
+  return undefined;
 }
 
 function getDivOfRange(shiftConf, start, end) {
   let td_list = document.getElementsByClassName("name");
   let startDate = idxToDate(shiftConf, start);
   let endDate = idxToDate(shiftConf, end);
-  if (startDate < 0 || endDate < 0) {
+  if (startDate === undefined || endDate === undefined) {
     return undefined;
   }
-  let div_list = td_list[0].querySelectorAll("div");
-  for (let d of div_list) {
-    console.log(d);
-    d.classList.add("constraint");
+  let div_list = [];
+  for (let date = startDate.date; date <= endDate.date; date++) {
+    let tmp = td_list[date].querySelectorAll("div");
+    if (date === startDate.date) {
+      for (let i = startDate.offset; i < tmp.length; i++) {
+        div_list.push(tmp[i]);
+      }
+    } else if (date === endDate.date) {
+      for (let i = 0; i <= endDate.offset; i++) {
+        div_list.push(tmp[i]);
+      }
+    } else {
+      div_list.push(...tmp);
+    }
   }
+  return div_list;
 }
-
-getDivOfRange(SHIFT_CONFIG, 0, 30);
 
 // modify calendar with blackList
-function colorConst(i) {
+function colorConst(shiftConf, workerList, blackList, i) {
   // get div of that worker
   let name_short = getName(workerList, i);
-  let select_list = document.getElementsByClassName(name_short);
-  for (let worker of select_list) {
-    worker.classList.add("constraint");
+
+  let tmp_black = blackList[i];
+  let errorBoard = document.getElementById("errorBoard");
+  let const_div = document.createElement("div");
+  const_div.classList.add("constraints", name_short);
+  const_div.innerText = "[" + name_short + "]";
+
+  errorBoard.appendChild(const_div);
+  for (let b of tmp_black) {
+    console.log(b);
+    if (b.type === 0 && b.list.length != 0) {
+      for (let c of b.list) {
+        let select_list = getDivOfRange(
+          shiftConf,
+          c.list[0],
+          c.list[c.list.length - 1]
+        );
+
+        let button = document.createElement("button");
+        button.classList.add("type" + b.type);
+        button.id = name_short + "constbtn";
+        button.val = 0;
+        button.innerHTML =
+          c.desc +
+          " : " +
+          (idxToDate(shiftConf, c.list[0]).date + 1) +
+          "~" +
+          (idxToDate(shiftConf, c.list[c.list.length - 1]).date + 1);
+        function toggle(btn, type) {
+          if (btn.val === 0) {
+            for (let div of select_list) {
+              div.classList.add(type);
+            }
+            btn.val = 1;
+          } else if (btn.val === 1) {
+            for (let div of select_list) {
+              div.classList.remove(type);
+            }
+            btn.val = 0;
+          }
+        }
+        button.onclick = function () {
+          toggle(button, "hardConst");
+        };
+        const_div.appendChild(button);
+      }
+    }
   }
 }
+
+for (let i = 0; i < workerList.length; i++) {
+  colorConst(SHIFT_CONFIG, workerList, blackList, i);
+}
+
+//createConstMenu()
 
 export function getShiftStats(shiftMask, output, workerList) {
   let result = Array(workerList.length);
