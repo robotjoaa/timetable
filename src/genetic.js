@@ -470,7 +470,6 @@ function colorConst(shiftConf, workerList, blackList, i) {
 
   errorBoard.appendChild(const_div);
   for (let b of tmp_black) {
-    console.log(b);
     if (b.type === 0 && b.list.length != 0) {
       for (let c of b.list) {
         let select_list = getDivOfRange(
@@ -513,9 +512,29 @@ function colorConst(shiftConf, workerList, blackList, i) {
 
 for (let i = 0; i < workerList.length; i++) {
   colorConst(SHIFT_CONFIG, workerList, blackList, i);
+  compareConst(SHIFT_CONFIG, workerList, blackList, i);
 }
 
-//createConstMenu()
+function compareConst(shiftConf, workerList, blackList, i) {
+  let tmp_black = blackList[i];
+  let name_short = getName(workerList, i);
+  for (let b of tmp_black) {
+    if (b.type === 0 && b.list.length != 0) {
+      for (let c of b.list) {
+        let select_list = getDivOfRange(
+          shiftConf,
+          c.list[0],
+          c.list[c.list.length - 1]
+        );
+        for (let div of select_list) {
+          if (div.classList.contains(name_short)) {
+            div.classList.add("wrong");
+          }
+        }
+      }
+    }
+  }
+}
 
 export function getShiftStats(shiftMask, output, workerList) {
   let result = Array(workerList.length);
