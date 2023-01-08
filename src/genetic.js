@@ -199,18 +199,32 @@ function isHoliday(a) {
   return a != 0 && a != 1;
 }
 
-function parseDate(str) {
-  let tmp = str.split("_").map((e) => {
-    return parseInt(e, 10);
-  });
-  let year = tmp[0];
-  let month = tmp[1];
-  let date = tmp[2];
-  let shift = tmp[3]; //주말일 경우, 0 : 주간1, 1 : 주간2, 2 : 야간, 평일일 경우 2 : 야간
+function parseDate(type, str) {
+  if (type === 0) {
+    let tmp = str.split("_").map((e) => {
+      return parseInt(e, 10);
+    });
+    let year = tmp[0];
+    let month = tmp[1];
+    let date = tmp[2];
+    let shift = tmp[3]; //주말일 경우, 0 : 주간1, 1 : 주간2, 2 : 야간, 평일일 경우 2 : 야간
+  } else if (type === 1) {
+    //with wild card
+    let tmp = str.split("_").map((e) => {
+      return parseInt(e, 10);
+    });
+    let year = isNaN(tmp[0]) ? YEAR : tmp[0];
+    let month = isNaN(tmp[1]) ? MONTH : tmp[1];
+    let date = isNaN(tmp[2]) ? -1 : tmp[2];
+    // if there is a wild card on date, it means every day
+    let shift = tmp[3];
+  }
   return { year: year, month: month, date: date, shift: shift };
 }
 
 function getIdxOfShift(date, shift, shiftConf) {
+  if (date === -1) return -1;
+
   let idx = 0;
   let shiftLen = shiftConf.dateOffset[date] - shiftConf.dateOffset[date - 1];
   if (shiftLen === 3) {
@@ -228,10 +242,9 @@ function compareYM(y1, m1, y2, m2) {
   return Math.sign(d2 - d1);
 }
 
-function makeDateValid(range, shiftConf) {
-  let startParse = parseDate(range.start);
-  let endParse = parseDate(range.end);
-  let isValid = true;
+function makeDateValid(type, range, shiftConf) {
+  let startParse = parseDate(type, range.start);
+  let endParse = parseDate(type, range.end);
   let startIdx = 0;
   let endIdx = shiftConf.result.length - 1;
   let cmpStart = compareYM(
@@ -243,25 +256,44 @@ function makeDateValid(range, shiftConf) {
   let cmpEnd = compareYM(YEAR % 100, MONTH, endParse.year, endParse.month);
   // is endParse after current YEAR and MONTH
   if (cmpEnd < 0) {
-    isValid = false;
+    return { isValid: false, list: [] };
   } else {
-    // is startParse before current YEAR and MONTH
-    if (cmpStart === 0)
-      startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
-    if (cmpEnd === 0)
-      endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
+    if (type === 0) {
+      // is startParse before current YEAR and MONTH
+      if (cmpStart === 0)
+        startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
+      if (cmpEnd === 0)
+        endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
+      return { isValid: true, list: range(startIdx, endIdx) };
+    } else if (type === 1) {
+      if (cmpStart === 0 && cmpEnd === 0) {
+        let result = [];
+        let monthInfo = configMonth(YEAR, MONTH);
+        // for shift in this month, get matching day, shift pattern
+        if(startParse.date === -1 && endParse.date === -1){
+          //sun ~ sat
+          for(let i = 0; i < monthInfo.len ; i++>){
+            let daynum = (i - monthInfo.offset) % 7;
+          } 
+        }else if(startParse.date >=0 && endParse.date >= 0){
+          if(startParse.date <= endParse.date){
+           
+          }
+        }
+      }
+    }
   }
-  return { isValid: isValid, start: startIdx, end: endIdx }; //get shift index
+  return { isValid: false, list: [] };
 }
 
-function* genBlackList(ranges, shiftConf) {
+function* genBlackList(type, ranges, shiftConf) {
   //create BlackList from ranges in constraints
   for (let r of ranges) {
-    let validDate = makeDateValid(r, shiftConf);
+    let validDate = makeDateValid(type, r, shiftConf);
     if (validDate.isValid)
       yield {
         desc: r.desc,
-        list: range(validDate.start, validDate.end),
+        list: validDate.list,
       };
   }
 }
@@ -275,7 +307,7 @@ function makeBlackList(workerList, shiftConf) {
     for (let i = 0; i < cList.length; i++) {
       let workerResult = { type: cList[i].type, list: [] };
       let ranges = cList[i].ranges;
-      let blackGen = genBlackList(ranges, shiftConf);
+      let blackGen = genBlackList(cList[i].type, ranges, shiftConf);
       while (true) {
         let tmp = blackGen.next();
         if (tmp.done) break;
