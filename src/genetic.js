@@ -200,31 +200,37 @@ function isHoliday(a) {
 }
 
 function parseDate(type, str) {
+  let year,
+    month,
+    date,
+    shift = 0;
+  let day = -1;
   if (type === 0) {
     let tmp = str.split("_").map((e) => {
       return parseInt(e, 10);
     });
-    let year = tmp[0];
-    let month = tmp[1];
-    let date = tmp[2];
-    let shift = tmp[3]; //주말일 경우, 0 : 주간1, 1 : 주간2, 2 : 야간, 평일일 경우 2 : 야간
+    year = tmp[0];
+    month = tmp[1];
+    date = tmp[2];
+    shift = tmp[3]; //주말일 경우, 0 : 주간1, 1 : 주간2, 2 : 야간, 평일일 경우 2 : 야간
   } else if (type === 1) {
     //with wild card
     let tmp = str.split("_").map((e) => {
       return parseInt(e, 10);
     });
-    let year = isNaN(tmp[0]) ? YEAR : tmp[0];
-    let month = isNaN(tmp[1]) ? MONTH : tmp[1];
-    let date = isNaN(tmp[2]) ? -1 : tmp[2];
-    // if there is a wild card on date, it means every day
-    let shift = tmp[3];
+    // *_*_*_*_0~2
+    year = isNaN(tmp[0]) ? YEAR % 100 : tmp[0];
+    month = isNaN(tmp[1]) ? MONTH : tmp[1];
+    date = isNaN(tmp[2]) ? -1 : tmp[2];
+    day = isNaN(tmp[3]) ? -1 : tmp[3];
+
+    shift = tmp[4]; // wild card not allowed
   }
-  return { year: year, month: month, date: date, shift: shift };
+  return { year: year, month: month, date: date, shift: shift, day: day };
 }
 
 function getIdxOfShift(date, shift, shiftConf) {
-  if (date === -1) return -1;
-
+  // date start from 1
   let idx = 0;
   let shiftLen = shiftConf.dateOffset[date] - shiftConf.dateOffset[date - 1];
   if (shiftLen === 3) {
@@ -242,9 +248,9 @@ function compareYM(y1, m1, y2, m2) {
   return Math.sign(d2 - d1);
 }
 
-function makeDateValid(type, range, shiftConf) {
-  let startParse = parseDate(type, range.start);
-  let endParse = parseDate(type, range.end);
+function makeDateValid(type, r, shiftConf) {
+  let startParse = parseDate(type, r.start);
+  let endParse = parseDate(type, r.end);
   let startIdx = 0;
   let endIdx = shiftConf.result.length - 1;
   let cmpStart = compareYM(
@@ -264,20 +270,43 @@ function makeDateValid(type, range, shiftConf) {
         startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
       if (cmpEnd === 0)
         endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
-      return { isValid: true, list: range(startIdx, endIdx) };
+      if (startIdx <= endIdx)
+        return { isValid: true, list: range(startIdx, endIdx) };
     } else if (type === 1) {
+      let result = [];
       if (cmpStart === 0 && cmpEnd === 0) {
-        let result = [];
         let monthInfo = configMonth(YEAR, MONTH);
-        // for shift in this month, get matching day, shift pattern
-        if(startParse.date === -1 && endParse.date === -1){
-          //sun ~ sat
-          for(let i = 0; i < monthInfo.len ; i++>){
-            let daynum = (i - monthInfo.offset) % 7;
-          } 
-        }else if(startParse.date >=0 && endParse.date >= 0){
-          if(startParse.date <= endParse.date){
-           
+        let idx_min = getIdxOfShift(
+          startParse.date,
+          startParse.shift,
+          shiftConf
+        );
+        let idx_max = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
+
+        if (startParse.day === -1 && endParse.day === -1) {
+          if (startParse.shift <= endParse.shift) {
+            for (let i = 1; i < monthInfo.len + 1; i++) {
+              startIdx = getIdxOfShift(i, startParse.shift, shiftConf);
+              endIdx = getIdxOfShift(i, endParse.shift, shiftConf);
+              result.push(...range(startIdx, endIdx));
+            }
+            return { isValid: true, list: result };
+          }
+        } else if (startParse.day >= 0 && endParse.day >= 0) {
+          if (startParse.day === endParse.day) {
+            // only work for certain day
+            if (startParse.shift <= endParse.shift) {
+              for (let i = 1; i < monthInfo.len + 1; i++) {
+                // if ith day is on the same day with startParse.date
+                let daynum = (i - 1 + monthInfo.offset) % 7;
+                if (daynum === startParse.day) {
+                  startIdx = getIdxOfShift(i, startParse.shift, shiftConf);
+                  endIdx = getIdxOfShift(i, endParse.shift, shiftConf);
+                  result.push(...range(startIdx, endIdx));
+                }
+              }
+              return { isValid: true, list: result };
+            }
           }
         }
       }
