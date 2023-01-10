@@ -241,6 +241,14 @@ function getIdxOfShift(date, shift, shiftConf) {
   return idx;
 }
 
+function getDateOfIdx(idx, shiftConf) {
+  for (let i = 0; i < shiftConf.dateOffset.length; i++) {
+    if (shiftConf.dateOffset[i] > idx) {
+      return i;
+    }
+  }
+}
+
 // is y2, m2 is equal or larger than y1, m1
 function compareYM(y1, m1, y2, m2) {
   let d1 = new Date(2000 + y1, m1, 1);
@@ -249,70 +257,103 @@ function compareYM(y1, m1, y2, m2) {
 }
 
 function makeDateValid(type, r, shiftConf) {
-  let startParse = parseDate(type, r.start);
-  let endParse = parseDate(type, r.end);
-  let startIdx = 0;
-  let endIdx = shiftConf.result.length - 1;
-  let cmpStart = compareYM(
-    startParse.year,
-    startParse.month,
-    YEAR % 100,
-    MONTH
-  );
-  let cmpEnd = compareYM(YEAR % 100, MONTH, endParse.year, endParse.month);
-  // is endParse after current YEAR and MONTH
-  if (cmpEnd < 0) {
-    return { isValid: false, list: [] };
-  } else {
-    if (type === 0) {
-      // is startParse before current YEAR and MONTH
-      if (cmpStart === 0)
-        startIdx = getIdxOfShift(startParse.date, startParse.shift, shiftConf);
-      if (cmpEnd === 0)
-        endIdx = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
-      if (startIdx <= endIdx)
-        return { isValid: true, list: range(startIdx, endIdx) };
-    } else if (type === 1) {
-      let result = [];
-      if (cmpStart === 0 && cmpEnd === 0) {
-        let monthInfo = configMonth(YEAR, MONTH);
-        let idx_min = getIdxOfShift(
-          startParse.date,
-          startParse.shift,
-          shiftConf
-        );
-        let idx_max = getIdxOfShift(endParse.date, endParse.shift, shiftConf);
+  let startP = parseDate(type, r.start);
+  let endP = parseDate(type, r.end);
 
-        if (startParse.day === -1 && endParse.day === -1) {
-          if (startParse.shift <= endParse.shift) {
-            for (let i = 1; i < monthInfo.len + 1; i++) {
-              startIdx = getIdxOfShift(i, startParse.shift, shiftConf);
-              endIdx = getIdxOfShift(i, endParse.shift, shiftConf);
-              result.push(...range(startIdx, endIdx));
-            }
-            return { isValid: true, list: result };
-          }
-        } else if (startParse.day >= 0 && endParse.day >= 0) {
-          if (startParse.day === endParse.day) {
-            // only work for certain day
-            if (startParse.shift <= endParse.shift) {
-              for (let i = 1; i < monthInfo.len + 1; i++) {
-                // if ith day is on the same day with startParse.date
-                let daynum = (i - 1 + monthInfo.offset) % 7;
-                if (daynum === startParse.day) {
-                  startIdx = getIdxOfShift(i, startParse.shift, shiftConf);
-                  endIdx = getIdxOfShift(i, endParse.shift, shiftConf);
-                  result.push(...range(startIdx, endIdx));
-                }
-              }
-              return { isValid: true, list: result };
-            }
-          }
-        }
+  let cmpStart = compareYM(startP.year, startP.month, YEAR % 100, MONTH);
+  let cmpEnd = compareYM(YEAR % 100, MONTH, endP.year, endP.month);
+  let idxMin = 0;
+  let idxMax = shiftConf.result.length - 1;
+
+  let invalidRes = { isValid: false, list: [] };
+  if (cmpStart < 0 || cmpEnd < 0) return invalidRes;
+  if (cmpStart === 0) {
+    if (startP.date === -1) idxMin = 0;
+    else idxMin = getIdxOfShift(startP.date, startP.shift, shiftConf);
+  }
+  if (cmpEnd === 0) {
+    if (endP.date === -1) idxMax = shiftConf.dateOffset.slice(-1)[0] - 1;
+    else idxMax = getIdxOfShift(endP.date, endP.shift, shiftConf);
+  }
+  if (idxMin > idxMax) return invalidRes;
+
+  if (type === 0) {
+    return { isValid: true, list: range(idxMin, idxMax) };
+  } else if (type === 1) {
+    let monthInfo = configMonth(YEAR, MONTH);
+    //1. check day
+    console.log(r.start, r.end, idxMin, idxMax);
+    let dayList = [];
+    if (startP.day < 0 && endP.day < 0) {
+      dayList = range(0, 6);
+    } else if (startP.day >= 0 && endP.day >= 0) {
+      let daytmp = startP.day;
+      while (true) {
+        dayList.push(daytmp);
+        if (daytmp != endP.day) {
+          daytmp += 1;
+          if (daytmp === 7) daytmp = 0;
+        } else break;
+      }
+    } else {
+      return invalidRes;
+    }
+
+    console.log(dayList);
+    let result = [];
+    let startIdx = -1;
+    let endIdx = -1;
+
+    function isShiftMatch(currShift, shift, len) {
+      if (len === 1) {
+        if (currShift === 0 && shift === 2) return true;
+      } else if (len === 3) {
+        if (currShift === shift) return true;
+      }
+      return false;
+    }
+    for (let i = idxMin; i <= idxMax; i++) {
+      let currDate = getDateOfIdx(i, shiftConf);
+      let currShift = i - shiftConf.dateOffset[currDate];
+      let tmp = (currDate - 1 + monthInfo.offset) % 7;
+      let len =
+        shiftConf.dateOffset[currDate + 1] - shiftConf.dateOffset[currDate];
+      console.log(i, currDate, tmp, startIdx, endIdx);
+
+      if (
+        dayList[0] === tmp &&
+        isShiftMatch(currShift, startP.shift, len) &&
+        startIdx < 0
+      ) {
+        startIdx = i;
+      }
+      if (
+        dayList[dayList.length - 1] === tmp &&
+        isShiftMatch(currShift, startP.shift, len) &&
+        endIdx < 0
+      ) {
+        endIdx = i;
+      }
+
+      if (startIdx >= 0 && endIdx >= 0) {
+        result.push(...range(startIdx, endIdx));
+        startIdx = -1;
+        endIdx = -1;
+      }
+
+      if (startIdx < 0 && endIdx > 0) {
+        //when it is cut by the month boundary
+        result.push(...range(idxMin, endIdx));
+        endIdx = -1;
       }
     }
+    if (startIdx >= 0 && endIdx < 0) {
+      //when it is cut by the month boundary
+      result.push(...range(startIdx, idxMax));
+    }
+    console.log(result);
+    return { isValid: true, list: result };
   }
-  return { isValid: false, list: [] };
 }
 
 function* genBlackList(type, ranges, shiftConf) {
