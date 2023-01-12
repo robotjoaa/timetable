@@ -299,11 +299,13 @@ function makeDateValid(type, r, shiftConf) {
       return invalidRes;
     }
 
-    console.log(dayList);
+    //console.log(dayList);
     let result = [];
     let startIdx = -1;
     let endIdx = -1;
 
+    let startLen = -1;
+    let endLen = -1;
     function isShiftMatch(currShift, shift, len) {
       if (len === 1) {
         if (currShift === 0 && shift === 2) return true;
@@ -312,46 +314,34 @@ function makeDateValid(type, r, shiftConf) {
       }
       return false;
     }
-    for (let i = idxMin; i <= idxMax; i++) {
-      let currDate = getDateOfIdx(i, shiftConf);
-      let currShift = i - shiftConf.dateOffset[currDate];
-      let tmp = (currDate - 1 + monthInfo.offset) % 7;
-      let len =
-        shiftConf.dateOffset[currDate + 1] - shiftConf.dateOffset[currDate];
-      console.log(i, currDate, tmp, startIdx, endIdx);
+    for (let d of dayList) {
+      for (let i = idxMin; i <= idxMax; i++) {
+        let currDate = getDateOfIdx(i, shiftConf);
+        let currShift = i - shiftConf.dateOffset[currDate - 1];
+        let tmp = (currDate - 1 + monthInfo.offset) % 7;
 
-      if (
-        dayList[0] === tmp &&
-        isShiftMatch(currShift, startP.shift, len) &&
-        startIdx < 0
-      ) {
-        startIdx = i;
-      }
-      if (
-        dayList[dayList.length - 1] === tmp &&
-        isShiftMatch(currShift, startP.shift, len) &&
-        endIdx < 0
-      ) {
-        endIdx = i;
-      }
-
-      if (startIdx >= 0 && endIdx >= 0) {
-        result.push(...range(startIdx, endIdx));
-        startIdx = -1;
-        endIdx = -1;
-      }
-
-      if (startIdx < 0 && endIdx > 0) {
-        //when it is cut by the month boundary
-        result.push(...range(idxMin, endIdx));
-        endIdx = -1;
+        let len =
+          shiftConf.dateOffset[currDate] - shiftConf.dateOffset[currDate - 1];
+        if (d === tmp) {
+          if (isShiftMatch(currShift, startP.shift, len) && startIdx < 0) {
+            startIdx = i;
+            startLen = len;
+            console.log(currShift, len, "start : " + startIdx);
+          }
+          if (isShiftMatch(currShift, endP.shift, len) && endIdx < 0) {
+            endIdx = i;
+            console.log(currShift, len, "end : " + endIdx);
+          }
+        }
+        if (startIdx >= 0 && endIdx >= startIdx) {
+          console.log(d, startIdx, endIdx);
+          result.push(...range(startIdx, endIdx));
+          startIdx = -1;
+          endIdx = -1;
+        }
       }
     }
-    if (startIdx >= 0 && endIdx < 0) {
-      //when it is cut by the month boundary
-      result.push(...range(startIdx, idxMax));
-    }
-    console.log(result);
+    result.sort((a, b) => a - b);
     return { isValid: true, list: result };
   }
 }
@@ -534,27 +524,14 @@ function idxToDate(shiftConf, idx) {
   return undefined;
 }
 
-function getDivOfRange(shiftConf, start, end) {
+function getDivOfList(shiftConf, list) {
   let td_list = document.getElementsByClassName("name");
-  let startDate = idxToDate(shiftConf, start);
-  let endDate = idxToDate(shiftConf, end);
-  if (startDate === undefined || endDate === undefined) {
-    return undefined;
-  }
   let div_list = [];
-  for (let date = startDate.date; date <= endDate.date; date++) {
-    let tmp = td_list[date].querySelectorAll("div");
-    if (date === startDate.date) {
-      for (let i = startDate.offset; i < tmp.length; i++) {
-        div_list.push(tmp[i]);
-      }
-    } else if (date === endDate.date) {
-      for (let i = 0; i <= endDate.offset; i++) {
-        div_list.push(tmp[i]);
-      }
-    } else {
-      div_list.push(...tmp);
-    }
+  for (let e of list) {
+    let tmp_date = idxToDate(shiftConf, e);
+    if (tmp_date === undefined) return undefined;
+    let tmp = td_list[tmp_date.date].querySelectorAll("div");
+    div_list.push(tmp[tmp_date.offset]);
   }
   return div_list;
 }
@@ -572,13 +549,9 @@ function colorConst(shiftConf, workerList, blackList, i) {
 
   errorBoard.appendChild(const_div);
   for (let b of tmp_black) {
-    if (b.type === 0 && b.list.length != 0) {
+    if (b.list.length != 0) {
       for (let c of b.list) {
-        let select_list = getDivOfRange(
-          shiftConf,
-          c.list[0],
-          c.list[c.list.length - 1]
-        );
+        let select_list = getDivOfList(shiftConf, c.list);
 
         let button = document.createElement("button");
         button.classList.add("type" + b.type);
@@ -621,13 +594,9 @@ function compareConst(shiftConf, workerList, blackList, i) {
   let tmp_black = blackList[i];
   let name_short = getName(workerList, i);
   for (let b of tmp_black) {
-    if (b.type === 0 && b.list.length != 0) {
+    if (b.list.length != 0) {
       for (let c of b.list) {
-        let select_list = getDivOfRange(
-          shiftConf,
-          c.list[0],
-          c.list[c.list.length - 1]
-        );
+        let select_list = getDivOfList(shiftConf, c.list);
         for (let div of select_list) {
           if (div.classList.contains(name_short)) {
             div.classList.add("wrong");
